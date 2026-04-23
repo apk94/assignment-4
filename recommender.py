@@ -75,13 +75,12 @@ class Recommender(object):
     def train_user_pearson(self, data_set, userId):
         weights = {}
         other_users = [c for c in data_set.columns if c != 'movieId' and c != userId]
+        df_subset = data_set.dropna()
         for other in other_users:
-            mask = data_set[userId].notna() & data_set[other].notna()
-            u, v = data_set.loc[mask, userId], data_set.loc[mask, other]
-            if len(u) < 2 or np.std(u) == 0 or np.std(v) == 0:
+            if len(df_subset) < 2 or np.std(df_subset[userId]) == 0 or np.std(df_subset[other]) == 0:
                 weights[other] = 0.0
             else:
-                corr, _ = pearsonr(u, v)
+                corr, _ = pearsonr(df_subset[userId], df_subset[other])
                 weights[other] = float(corr) if not np.isnan(corr) else 0.0
         return weights
 
@@ -139,12 +138,12 @@ class Recommender(object):
 
     def evaluate(self, existing_ratings, predicted_ratings):
         actual = {m: r for m, r in existing_ratings}
-        pred = {m: r for m, r in predicted_ratings}
+        pred = {m: r for m, r in predicted_ratings if r is not None}
         common = set(actual.keys()) & set(pred.keys())
         ratio = len(common) / len(actual) if actual else 0.0
         if not common:
             return {'rmse': 0.0, 'ratio': float(ratio)}
-        mse = sum([(actual[m] - pred[m])**2 for m in common]) / len(common)
+        mse = sum((float(actual[m]) - float(pred[m]))**2 for m in common) / len(common)
         return {'rmse': float(math.sqrt(mse)), 'ratio': float(ratio)}
 
     def single_calculation(self, distance_function, userId, k_values):
